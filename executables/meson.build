@@ -5,3 +5,4 @@ executable(
 	link_with : [lib],
 	dependencies : [mpi]
 )
+subdir('milestone02')

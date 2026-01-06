@@ -14,7 +14,7 @@ project(
 # Optional dependency: Kokkos C++ performance portability library
 # Make sure to add 'kokkoscore' to the dependencies in your subdirectories if you
 # enable this.
-# kokkoscore = dependency('kokkoscore')
+kokkos = dependency('kokkoscore')
 
 # Detect MPI, but make it optional
 mpi = dependency('mpi', language: 'cpp', required: false)
