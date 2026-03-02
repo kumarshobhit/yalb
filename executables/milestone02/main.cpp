@@ -1,142 +1,180 @@
+#include "lbm_d2q9.h"
+
 #include <Kokkos_Core.hpp>
+
+#include <filesystem>
+#include <iomanip>
 #include <iostream>
-#include <fstream>
-#include <vector>
+#include <stdexcept>
+#include <sstream>
+#include <string>
+#include <utility>
 
-// --- D2Q9 Constants ---
-// 9 Directions: Center (0), E, N, W, S, NE, NW, SW, SE
-const int cx[9] = {0, 1, 0, -1, 0, 1, -1, -1, 1};
-const int cy[9] = {0, 0, 1, 0, -1, 1, 1, -1, -1};
+namespace {
 
-// Grid Dimensions (Small for testing)
-const int Nx = 15;
-const int Ny = 10;
-const int Q = 9; // 9 velocities
+struct SimulationConfig {
+    int nx = 15;
+    int ny = 10;
+    int steps = 10;
+    int initial_x = 5;
+    int initial_y = 5;
+    int direction = 1;
+    double value = 1.0;
+    std::filesystem::path output_dir = "outputs";
+};
 
-// Function to compute Density and Velocity at every cell
-// Stores result in 'density' and 'velocity' views
-void compute_moments(Kokkos::View<double***> f, 
-                     Kokkos::View<double**> rho, 
-                     Kokkos::View<double***> u, 
-                     int Nx, int Ny) {
-    
-    Kokkos::parallel_for("ComputeMoments", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {Nx, Ny}),
-    KOKKOS_LAMBDA(const int x, const int y) {
-        double density = 0.0;
-        double u_x = 0.0;
-        double u_y = 0.0;
-
-        // Sum up all 9 directions
-        for (int i = 0; i < 9; ++i) {
-            double val = f(x, y, i);
-            density += val;             // Density = Sum of f
-            u_x += val * cx[i];         // Velocity X = Sum of (f * direction_x)
-            u_y += val * cy[i];         // Velocity Y = Sum of (f * direction_y)
-        }
-
-        // Store Density
-        rho(x, y) = density;
-
-        // Normalize Velocity (u = momentum / density)
-        // Avoid division by zero!
-        if (density > 1e-9) {
-            u(x, y, 0) = u_x / density;
-            u(x, y, 1) = u_y / density;
-        } else {
-            u(x, y, 0) = 0.0;
-            u(x, y, 1) = 0.0;
-        }
-    });
+std::string make_output_name(const std::filesystem::path& directory, const std::string& prefix, int step) {
+    std::ostringstream filename;
+    filename << prefix << "_step_" << std::setw(3) << std::setfill('0') << step << ".csv";
+    return (directory / filename.str()).string();
 }
 
-void write_output(std::string filename, Kokkos::View<double**> rho, int Nx, int Ny) {
-    auto rho_host = Kokkos::create_mirror_view(rho);
-    Kokkos::deep_copy(rho_host, rho); // Copy from GPU/Device to CPU
-
-    std::ofstream file(filename);
-    for (int y = 0; y < Ny; ++y) {
-        for (int x = 0; x < Nx; ++x) {
-            file << rho_host(x, y);
-            if (x < Nx - 1) file << ","; // CSV format
-        }
-        file << "\n";
+int parse_int_argument(const std::string& option, const char* value) {
+    try {
+        return std::stoi(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid integer value for " + option + ": " + value);
     }
-    file.close();
 }
+
+double parse_double_argument(const std::string& option, const char* value) {
+    try {
+        return std::stod(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid floating-point value for " + option + ": " + value);
+    }
+}
+
+void print_usage(const char* program_name) {
+    std::cout << "Usage: " << program_name << " [options]\n"
+              << "  --nx <int>            Grid width (default: 15)\n"
+              << "  --ny <int>            Grid height (default: 10)\n"
+              << "  --steps <int>         Number of time steps (default: 10)\n"
+              << "  --x <int>             Initial packet x coordinate (default: 5)\n"
+              << "  --y <int>             Initial packet y coordinate (default: 5)\n"
+              << "  --direction <0-8>     Initial D2Q9 direction index (default: 1)\n"
+              << "  --value <double>      Initial packet value (default: 1.0)\n"
+              << "  --output-dir <path>   Directory for CSV outputs (default: outputs)\n"
+              << "  --help                Show this help message\n";
+}
+
+SimulationConfig parse_arguments(int argc, char* argv[]) {
+    SimulationConfig config;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string option = argv[i];
+        auto require_value = [&](const std::string& current_option) -> const char* {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value for " + current_option);
+            }
+            return argv[++i];
+        };
+
+        if (option == "--help") {
+            print_usage(argv[0]);
+            std::exit(0);
+        }
+        if (option == "--nx") {
+            config.nx = parse_int_argument(option, require_value(option));
+        } else if (option == "--ny") {
+            config.ny = parse_int_argument(option, require_value(option));
+        } else if (option == "--steps") {
+            config.steps = parse_int_argument(option, require_value(option));
+        } else if (option == "--x") {
+            config.initial_x = parse_int_argument(option, require_value(option));
+        } else if (option == "--y") {
+            config.initial_y = parse_int_argument(option, require_value(option));
+        } else if (option == "--direction") {
+            config.direction = parse_int_argument(option, require_value(option));
+        } else if (option == "--value") {
+            config.value = parse_double_argument(option, require_value(option));
+        } else if (option == "--output-dir") {
+            config.output_dir = require_value(option);
+        } else {
+            throw std::runtime_error("Unknown option: " + option);
+        }
+    }
+
+    if (config.nx <= 0 || config.ny <= 0) {
+        throw std::runtime_error("Grid dimensions must be positive.");
+    }
+    if (config.steps < 0) {
+        throw std::runtime_error("Number of steps must be non-negative.");
+    }
+    if (config.direction < 0 || config.direction >= lbm_d2q9::Q) {
+        throw std::runtime_error("Direction must be between 0 and 8.");
+    }
+    if (config.initial_x < 0 || config.initial_x >= config.nx || config.initial_y < 0 || config.initial_y >= config.ny) {
+        throw std::runtime_error("Initial packet coordinates must lie inside the grid.");
+    }
+    if (config.value < 0.0) {
+        throw std::runtime_error("Initial packet value must be non-negative.");
+    }
+
+    return config;
+}
+
+}  // namespace
 
 int main(int argc, char* argv[]) {
-    // Initialize Kokkos (and MPI implicitly if enabled)
+    const SimulationConfig config = [&]() {
+        try {
+            return parse_arguments(argc, argv);
+        } catch (const std::exception& error) {
+            std::cerr << error.what() << std::endl;
+            print_usage(argv[0]);
+            std::exit(1);
+        }
+    }();
+
     Kokkos::initialize(argc, argv);
     {
         std::cout << "Initializing Milestone 2 Simulation..." << std::endl;
+        std::cout << "Grid: " << config.nx << "x" << config.ny << ", steps: " << config.steps
+                  << ", initial packet: (" << config.initial_x << ", " << config.initial_y << "), direction "
+                  << config.direction << ", value " << config.value << std::endl;
 
-        // 1. Create Data Structures (Views)
-        Kokkos::View<double***> f("f", Nx, Ny, Q);
-        Kokkos::View<double***> f_next("f_next", Nx, Ny, Q);
-        
-        // NEW: Views for Density (rho) and Velocity (u)
-        Kokkos::View<double**> rho("rho", Nx, Ny);
-        Kokkos::View<double***> u("u", Nx, Ny, 2); // 2 components: x, y
+        lbm_d2q9::DistributionView f("f", config.nx, config.ny, lbm_d2q9::Q);
+        lbm_d2q9::DistributionView f_next("f_next", config.nx, config.ny, lbm_d2q9::Q);
+        lbm_d2q9::DensityView rho("rho", config.nx, config.ny);
+        lbm_d2q9::VelocityView u("u", config.nx, config.ny, 2);
 
-        // 2. Initialize with some data
-        auto f_host = Kokkos::create_mirror_view(f);
-        
-        // Set a dot of density 1.0 moving East (direction 1) at (5,5)
-        f_host(5, 5, 1) = 1.0; 
-        
-        Kokkos::deep_copy(f, f_host);
+        std::filesystem::create_directories(config.output_dir);
 
-        // 3. Time Stepping Loop
-        int num_steps = 10;
-        for (int step = 0; step < num_steps; ++step) {
-            
-            // --- STREAMING STEP ---
-            Kokkos::parallel_for("Streaming", Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {Nx, Ny}),
-            KOKKOS_LAMBDA(const int x, const int y) {
-                for (int i = 0; i < Q; ++i) {
-                    // Reverse direction to pull from neighbor
-                    int neighbor_x = x - cx[i];
-                    int neighbor_y = y - cy[i];
+        lbm_d2q9::initialize_single_packet(f, config.initial_x, config.initial_y, config.direction, config.value);
 
-                    // Periodic Boundary Conditions
-                    if (neighbor_x < 0) neighbor_x += Nx;
-                    if (neighbor_x >= Nx) neighbor_x -= Nx;
-                    
-                    if (neighbor_y < 0) neighbor_y += Ny;
-                    if (neighbor_y >= Ny) neighbor_y -= Ny;
+        for (int step = 0; step < config.steps; ++step) {
+            lbm_d2q9::streaming(f, f_next, config.nx, config.ny);
+            Kokkos::fence();
+            std::swap(f, f_next);
 
-                    // Pull the value
-                    f_next(x, y, i) = f(neighbor_x, neighbor_y, i);
-                }
-            });
+            lbm_d2q9::compute_density(f, rho, config.nx, config.ny);
+            lbm_d2q9::compute_velocity(f, rho, u, config.nx, config.ny);
             Kokkos::fence();
 
-            // Update f for the next step
-            Kokkos::deep_copy(f, f_next);
+            const std::string rho_filename = make_output_name(config.output_dir, "rho", step);
+            const std::string ux_filename = make_output_name(config.output_dir, "ux", step);
+            const std::string uy_filename = make_output_name(config.output_dir, "uy", step);
 
-            // --- COMPUTE MOMENTS (Density & Velocity) ---
-            compute_moments(f, rho, u, Nx, Ny);
+            lbm_d2q9::write_scalar_csv(rho_filename, rho, config.nx, config.ny);
+            lbm_d2q9::write_velocity_csv_pair(ux_filename, uy_filename, u, config.nx, config.ny);
 
-            std::string filename = "output_" + std::to_string(step) + ".csv";
-            write_output(filename, rho, Nx, Ny);
-            std::cout << "Step " << step << ": Written to " << filename << std::endl;
+            std::cout << "Step " << step << ": wrote " << rho_filename << ", " << ux_filename << ", " << uy_filename
+                      << std::endl;
 
-            // --- PRINT POSITION ---
-            // We need to copy 'rho' back to the CPU (Host) to read it with if-statements
-            auto rho_host = Kokkos::create_mirror_view(rho);
-            Kokkos::deep_copy(rho_host, rho);
-
-            // Scan the grid to find where our particle is
+            const auto rho_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), rho);
             bool found = false;
-            for(int x = 0; x < Nx; ++x) {
-                for(int y = 0; y < Ny; ++y) {
-                    if(rho_host(x, y) > 0.5) { // If density is high
+            for (int x = 0; x < config.nx; ++x) {
+                for (int y = 0; y < config.ny; ++y) {
+                    if (rho_host(x, y) > 0.5) {
                         std::cout << "Step " << step << ": Particle found at (" << x << ", " << y << ")" << std::endl;
                         found = true;
                     }
                 }
             }
-            if(!found) std::cout << "Step " << step << ": Particle lost (Mass Error!)" << std::endl;
+            if (!found) {
+                std::cout << "Step " << step << ": Particle lost (Mass Error!)" << std::endl;
+            }
         }
     }
     Kokkos::finalize();

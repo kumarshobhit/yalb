@@ -75,6 +75,65 @@ looking for bugs, `debug` should be used instead.
 
 Try compiling and running tests with both compilation configurations.
 
+### Running milestone02
+
+The repository now includes a `milestone02` executable that implements the
+streaming-only D2Q9 lattice Boltzmann milestone with Kokkos.
+
+Build it from the command line with:
+
+```bash
+meson compile -C builddir milestone02
+```
+
+Run it with the default setup:
+
+```bash
+cd builddir
+./executables/milestone02/milestone02
+```
+
+This writes density and velocity snapshots to `builddir/outputs/`:
+
+- `rho_step_000.csv`
+- `ux_step_000.csv`
+- `uy_step_000.csv`
+
+The executable accepts a few parameters so you can experiment without editing
+the source:
+
+```bash
+./executables/milestone02/milestone02 \
+  --nx 20 \
+  --ny 12 \
+  --steps 15 \
+  --x 3 \
+  --y 4 \
+  --direction 1 \
+  --value 1.0 \
+  --output-dir outputs/custom_run
+```
+
+Options:
+
+- `--nx`, `--ny`: grid width and height
+- `--steps`: number of streaming steps
+- `--x`, `--y`: initial packet position
+- `--direction`: initial D2Q9 direction index from `0` to `8`
+- `--value`: initial packet magnitude
+- `--output-dir`: output folder for CSV files
+
+To generate plots from the output files, run:
+
+```bash
+cd builddir
+python3 ../executables/milestone02/plot.py
+```
+
+The plotting script reads `outputs/rho_step_*.csv` and, if present,
+`outputs/ux_step_*.csv` plus `outputs/uy_step_*.csv`, then writes PNGs into
+`outputs/plots/`.
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:

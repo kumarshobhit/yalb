@@ -1,7 +1,8 @@
 google_test = dependency('gtest')
 
 test_sources = [
-    'test_hello_world.cpp'
+    'test_hello_world.cpp',
+    'test_lbm_d2q9.cpp'
 ]
 
 if mpi.found()
@@ -19,7 +20,7 @@ tests = executable(
     test_sources,
     include_directories : [lib_incdirs],
     link_with : [lib],
-    dependencies : [google_test, mpi]
+    dependencies : [google_test, kokkos, mpi]
 )
 
 test('Tests', tests)

@@ -1,6 +1,12 @@
+fs = import('fs')
+
 executable(
     'milestone02',
     'main.cpp',
-    dependencies : [kokkos, mpi], # Add eigen if needed
+    include_directories : [lib_incdirs],
+    link_with : [lib],
+    dependencies : [kokkos, mpi],
     install : true
 )
+
+fs.copyfile('plot.py')
