@@ -6,3 +6,4 @@ executable(
 	dependencies : [mpi]
 )
 subdir('milestone02')
+subdir('milestone03')

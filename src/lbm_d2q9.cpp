@@ -12,6 +12,21 @@ void initialize_single_packet(DistributionView f, int x, int y, int direction, d
     Kokkos::deep_copy(f, host_f);
 }
 
+void initialize_from_macroscopic_fields(const DensityView& rho, const VelocityView& u, DistributionView& f, int nx, int ny) {
+    Kokkos::parallel_for(
+        "initialize_from_macroscopic_fields",
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        KOKKOS_LAMBDA(const int x, const int y) {
+            const double density = rho(x, y);
+            const double ux = u(x, y, 0);
+            const double uy = u(x, y, 1);
+
+            for (int direction = 0; direction < Q; ++direction) {
+                f(x, y, direction) = equilibrium_population(density, ux, uy, direction);
+            }
+        });
+}
+
 void streaming(const DistributionView& f_in, DistributionView& f_out, int nx, int ny) {
     Kokkos::parallel_for(
         "streaming",
@@ -74,6 +89,22 @@ void compute_velocity(const DistributionView& f, const DensityView& rho, Velocit
 
             u(x, y, 0) = momentum_x / density;
             u(x, y, 1) = momentum_y / density;
+        });
+}
+
+void collide_bgk(DistributionView& f, const DensityView& rho, const VelocityView& u, double omega, int nx, int ny) {
+    Kokkos::parallel_for(
+        "collide_bgk",
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        KOKKOS_LAMBDA(const int x, const int y) {
+            const double density = rho(x, y);
+            const double ux = u(x, y, 0);
+            const double uy = u(x, y, 1);
+
+            for (int direction = 0; direction < Q; ++direction) {
+                const double f_eq = equilibrium_population(density, ux, uy, direction);
+                f(x, y, direction) += omega * (f_eq - f(x, y, direction));
+            }
         });
 }
 

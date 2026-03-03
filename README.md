@@ -134,6 +134,62 @@ The plotting script reads `outputs/rho_step_*.csv` and, if present,
 `outputs/ux_step_*.csv` plus `outputs/uy_step_*.csv`, then writes PNGs into
 `outputs/plots/`.
 
+### Running milestone03
+
+The repository also includes a `milestone03` executable that adds the BGK
+collision operator on top of the D2Q9 streaming step.
+
+Build it from the command line with:
+
+```bash
+meson compile -C builddir executables/milestone03/milestone03
+```
+
+Run the default "bump" scenario:
+
+```bash
+cd builddir
+./executables/milestone03/milestone03 --steps 50 --output-dir outputs_m3_bump
+```
+
+This initializes a uniform density field with a slightly higher density at the
+ center of the domain and zero initial velocity everywhere.
+
+Run the "drift" scenario:
+
+```bash
+cd builddir
+./executables/milestone03/milestone03 \
+  --steps 50 \
+  --scenario drift \
+  --output-dir outputs_m3_drift
+```
+
+This initializes a localized higher-density region with a small positive
+ x-velocity so you can observe transport and relaxation together.
+
+Useful options:
+
+- `--nx`, `--ny`: grid width and height
+- `--steps`: number of time steps
+- `--omega`: BGK relaxation parameter, must satisfy `0 < omega < 2`
+- `--scenario`: either `bump` or `drift`
+- `--base-rho`: background density
+- `--bump-rho`: higher density used for the center bump or drifting blob
+- `--drift-ux`: x-velocity used in the `drift` scenario
+- `--output-dir`: output folder for CSV files
+
+To generate plots from the Milestone 03 output files, run:
+
+```bash
+cd builddir
+python3 ../executables/milestone03/plot.py --input-dir outputs_m3_bump
+python3 ../executables/milestone03/plot.py --input-dir outputs_m3_drift
+```
+
+The plotting script reads `rho_step_*.csv`, `ux_step_*.csv`, and
+`uy_step_*.csv`, then writes PNGs into `<output-dir>/plots/`.
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:
