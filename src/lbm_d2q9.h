@@ -13,6 +13,8 @@ using DistributionView = Kokkos::View<double***>;
 using DensityView = Kokkos::View<double**>;
 using VelocityView = Kokkos::View<double***>;
 
+constexpr double pi = 3.14159265358979323846;
+
 KOKKOS_INLINE_FUNCTION
 double weight(int direction) {
     constexpr double values[Q] = {4.0 / 9.0,
@@ -47,11 +49,29 @@ double equilibrium_population(double rho, double ux, double uy, int direction) {
 }
 
 void initialize_single_packet(DistributionView f, int x, int y, int direction, double value);
+void initialize_uniform_macroscopic_fields(
+    DensityView rho,
+    VelocityView u,
+    int nx,
+    int ny,
+    double rho0,
+    double ux0,
+    double uy0);
+void initialize_shear_wave_macroscopic_fields(
+    DensityView rho,
+    VelocityView u,
+    int nx,
+    int ny,
+    double rho0,
+    double amplitude);
 void initialize_from_macroscopic_fields(const DensityView& rho, const VelocityView& u, DistributionView& f, int nx, int ny);
 void streaming(const DistributionView& f_in, DistributionView& f_out, int nx, int ny);
 void compute_density(const DistributionView& f, DensityView& rho, int nx, int ny);
 void compute_velocity(const DistributionView& f, const DensityView& rho, VelocityView& u, int nx, int ny);
 void collide_bgk(DistributionView& f, const DensityView& rho, const VelocityView& u, double omega, int nx, int ny);
+double theoretical_viscosity_from_omega(double omega);
+double analytical_shear_wave_amplitude(double initial_amplitude, double viscosity, int ny, int step);
+double measure_shear_wave_amplitude(const VelocityView& u, int nx, int ny);
 
 void write_scalar_csv(const std::string& filename, const DensityView& field, int nx, int ny);
 void write_velocity_csv_pair(

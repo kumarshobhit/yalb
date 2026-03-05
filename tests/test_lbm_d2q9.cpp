@@ -9,24 +9,6 @@ namespace {
 constexpr int Nx = 15;
 constexpr int Ny = 10;
 
-class KokkosEnvironment : public ::testing::Environment {
-public:
-    void SetUp() override {
-        if (!Kokkos::is_initialized()) {
-            Kokkos::initialize();
-        }
-    }
-
-    void TearDown() override {
-        if (Kokkos::is_initialized()) {
-            Kokkos::finalize();
-        }
-    }
-};
-
-[[maybe_unused]] ::testing::Environment* const kokkos_environment =
-    ::testing::AddGlobalTestEnvironment(new KokkosEnvironment);
-
 double total_mass(const lbm_d2q9::DistributionView& f) {
     const auto host_f = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), f);
     double mass = 0.0;

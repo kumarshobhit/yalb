@@ -190,6 +190,90 @@ python3 ../executables/milestone03/plot.py --input-dir outputs_m3_drift
 The plotting script reads `rho_step_*.csv`, `ux_step_*.csv`, and
 `uy_step_*.csv`, then writes PNGs into `<output-dir>/plots/`.
 
+### Running milestone04
+
+Milestone 4 validates the BGK D2Q9 solver with a 2D shear-wave decay benchmark.
+
+Build it from the command line with:
+
+```bash
+meson compile -C builddir executables/milestone04/milestone04
+```
+
+Run the benchmark:
+
+```bash
+cd builddir
+./executables/milestone04/milestone04 \
+  --nx 64 \
+  --ny 64 \
+  --steps 200 \
+  --omega 1.0 \
+  --rho0 0.2 \
+  --amplitude 0.05 \
+  --output-dir outputs_m4
+```
+
+This writes:
+
+- `shear_decay.csv` with columns
+  - `step,time,a_sim,a_theory,relative_error`
+- field snapshots (`rho_step_###.csv`, `ux_step_###.csv`, `uy_step_###.csv`)
+  every `--write-field-every` steps
+
+Useful options:
+
+- `--omega`: BGK relaxation parameter (`0 < omega < 2`)
+- `--amplitude`: initial shear-wave amplitude (`0 <= amplitude < 0.1`)
+- `--write-field-every`: output interval for field snapshots
+- `--output-dir`: destination folder
+
+Generate validation plots:
+
+```bash
+cd builddir
+python3 ../executables/milestone04/plot.py --input-dir outputs_m4
+```
+
+Generated files include:
+
+- `plots/shear_decay.png` (simulated vs analytical amplitude decay)
+- `plots/relative_error.png`
+- `plots/velocity_profile_step_###.png` (x-averaged velocity profiles with fixed y-scale)
+- `plots/velocity_profile_overlay.png` (velocity profiles over multiple steps)
+- `plots/density_profile_step_###.png` (x-averaged density profiles with fixed y-scale)
+- `plots/density_profile_overlay.png` (density profiles over multiple steps)
+
+The script also writes `plots/profile_overlay.png` for backward compatibility.
+
+Measure viscosity as a function of `omega` and compare to analytical theory:
+
+```bash
+cd <repo>
+python3 executables/milestone04/measure_viscosity_vs_omega.py \
+  --build-dir build_milestone \
+  --nx 64 \
+  --ny 64 \
+  --steps 200 \
+  --rho0 0.2 \
+  --amplitude 0.05 \
+  --omegas 0.6,0.8,1.0,1.2,1.4,1.6 \
+  --output-dir build_milestone/outputs_m4_sweep
+```
+
+This produces:
+
+- `build_milestone/outputs_m4_sweep/viscosity_vs_omega.csv`
+- `build_milestone/outputs_m4_sweep/viscosity_vs_omega.png`
+
+The CSV columns are:
+
+- `omega`
+- `nu_measured`
+- `nu_theory`
+- `relative_error`
+- `fit_r2`
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:
