@@ -8,3 +8,4 @@ executable(
 subdir('milestone02')
 subdir('milestone03')
 subdir('milestone04')
+subdir('milestone05')

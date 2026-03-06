@@ -274,6 +274,75 @@ The CSV columns are:
 - `relative_error`
 - `fit_r2`
 
+### Running milestone05
+
+Milestone 5 simulates the 2D D2Q9 lid-driven cavity with no-slip walls on
+left/right/bottom and a moving top lid.
+
+Build it from the command line with:
+
+```bash
+meson compile -C builddir executables/milestone05/milestone05
+```
+
+Run with defaults:
+
+```bash
+cd builddir
+./executables/milestone05/milestone05
+```
+
+Run with explicit settings (report-ready setup):
+
+```bash
+cd builddir
+./executables/milestone05/milestone05 \
+  --nx 128 \
+  --ny 128 \
+  --steps 20000 \
+  --omega 1.0 \
+  --rho0 1.0 \
+  --lid-ux 0.05 \
+  --lid-uy 0.0 \
+  --write-field-every 1000 \
+  --residual-every 1000 \
+  --output-dir outputs_m5
+```
+
+Useful options:
+
+- `--nx`, `--ny`: grid dimensions (`> 2`)
+- `--steps`: number of time steps (`>= 0`)
+- `--omega`: BGK relaxation parameter (`0 < omega < 2`)
+- `--rho0`: initial density and wall density used in moving-wall correction (`> 0`)
+- `--lid-ux`, `--lid-uy`: top-wall velocity components (`|u| < 0.1`)
+- `--write-field-every`: output interval for `rho/ux/uy` snapshots
+- `--residual-every`: output interval for residual report (`max_delta_u`)
+- `--output-dir`: output folder
+
+Generated simulation artifacts include:
+
+- `residual_history.csv` (`step,max_delta_u`)
+- `rho_step_#####.csv`, `ux_step_#####.csv`, `uy_step_#####.csv`
+
+Generate Milestone 05 plots:
+
+```bash
+cd builddir
+python3 ../executables/milestone05/plot.py --input-dir outputs_m5
+```
+
+This writes into `outputs_m5/plots/`:
+
+- `velocity_quiver_last.png`
+- `streamlines_last.png`
+- `speed_contour_last.png`
+- `u_centerline_vertical_last.png`
+- `v_centerline_horizontal_last.png`
+- `velocity_profile_overlay.png`
+- `density_profile_overlay.png`
+- `residual_history.png`
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:

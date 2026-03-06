@@ -42,6 +42,12 @@ int cy(int direction) {
 }
 
 KOKKOS_INLINE_FUNCTION
+int opposite(int direction) {
+    constexpr int values[Q] = {0, 3, 4, 1, 2, 7, 8, 5, 6};
+    return values[direction];
+}
+
+KOKKOS_INLINE_FUNCTION
 double equilibrium_population(double rho, double ux, double uy, int direction) {
     const double c_dot_u = static_cast<double>(cx(direction)) * ux + static_cast<double>(cy(direction)) * uy;
     const double u_squared = ux * ux + uy * uy;
@@ -66,6 +72,14 @@ void initialize_shear_wave_macroscopic_fields(
     double amplitude);
 void initialize_from_macroscopic_fields(const DensityView& rho, const VelocityView& u, DistributionView& f, int nx, int ny);
 void streaming(const DistributionView& f_in, DistributionView& f_out, int nx, int ny);
+void stream_with_cavity_boundaries(
+    const DistributionView& f_in,
+    DistributionView& f_out,
+    int nx,
+    int ny,
+    double lid_ux,
+    double lid_uy,
+    double rho_wall);
 void compute_density(const DistributionView& f, DensityView& rho, int nx, int ny);
 void compute_velocity(const DistributionView& f, const DensityView& rho, VelocityView& u, int nx, int ny);
 void collide_bgk(DistributionView& f, const DensityView& rho, const VelocityView& u, double omega, int nx, int ny);

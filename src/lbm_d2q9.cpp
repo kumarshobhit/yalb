@@ -91,6 +91,47 @@ void streaming(const DistributionView& f_in, DistributionView& f_out, int nx, in
         });
 }
 
+void stream_with_cavity_boundaries(
+    const DistributionView& f_in,
+    DistributionView& f_out,
+    int nx,
+    int ny,
+    double lid_ux,
+    double lid_uy,
+    double rho_wall) {
+    Kokkos::parallel_for(
+        "stream_with_cavity_boundaries",
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        KOKKOS_LAMBDA(const int x, const int y) {
+            for (int direction = 0; direction < Q; ++direction) {
+                const int source_x = x - cx(direction);
+                const int source_y = y - cy(direction);
+                const bool source_outside =
+                    (source_x < 0 || source_x >= nx || source_y < 0 || source_y >= ny);
+
+                if (!source_outside) {
+                    f_out(x, y, direction) = f_in(source_x, source_y, direction);
+                    continue;
+                }
+
+                // Bounce-back for non-periodic cavity walls:
+                // f_out(x,y,opp(i)) = f_in(x,y,i) for stationary walls.
+                const int incoming = opposite(direction);
+                double bounced = f_in(x, y, incoming);
+
+                // Top wall uses moving-wall correction:
+                // f_out(x,y,opp(i)) = f_in(x,y,i) - 6*w_i*rho*(c_i.u_wall).
+                if (source_y >= ny) {
+                    const double c_dot_u =
+                        static_cast<double>(cx(incoming)) * lid_ux + static_cast<double>(cy(incoming)) * lid_uy;
+                    bounced -= 6.0 * weight(incoming) * rho_wall * c_dot_u;
+                }
+
+                f_out(x, y, direction) = bounced;
+            }
+        });
+}
+
 void compute_density(const DistributionView& f, DensityView& rho, int nx, int ny) {
     Kokkos::parallel_for(
         "compute_density",
