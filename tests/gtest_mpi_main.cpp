@@ -23,6 +23,7 @@
 */
 
 #include <mpi.h>
+#include <Kokkos_Core.hpp>
 
 #include <gtest/gtest.h>
 #include <gtest-mpi-listener.hpp>
@@ -34,6 +35,7 @@ int main(int argc, char** argv) {
 
     // Initialize MPI
     MPI_Init(&argc, &argv);
+    Kokkos::initialize(argc, argv);
 
     // Add object that will finalize MPI on exit; Google Test owns this pointer
     ::testing::AddGlobalTestEnvironment(new GTestMPIListener::MPIEnvironment);
@@ -50,6 +52,7 @@ int main(int argc, char** argv) {
     // Run tests, then clean up and exit. RUN_ALL_TESTS() returns 0 if all tests
     // pass and 1 if some test fails.
     int result{RUN_ALL_TESTS()};
+    Kokkos::finalize();
 
     return result;  // Run tests, then clean up and exit
 }

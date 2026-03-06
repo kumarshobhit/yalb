@@ -10,7 +10,8 @@ test_sources = [
 
 if mpi.found()
     test_sources += [
-        'gtest_mpi_main.cpp'
+        'gtest_mpi_main.cpp',
+        'test_lbm_mpi_cavity.cpp'
     ]
 else
     test_sources += [

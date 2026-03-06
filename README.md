@@ -343,6 +343,79 @@ This writes into `outputs_m5/plots/`:
 - `density_profile_overlay.png`
 - `residual_history.png`
 
+### Running milestone06
+
+Milestone 6 parallelizes the lid-driven cavity solver across MPI ranks with
+1D x-direction domain decomposition and one-column halo exchange.
+
+Build it (only available when MPI is found during Meson configure):
+
+```bash
+meson compile -C builddir executables/milestone06/milestone06
+```
+
+Run on 4 ranks:
+
+```bash
+cd builddir
+mpirun -np 4 ./executables/milestone06/milestone06 \
+  --nx 128 \
+  --ny 128 \
+  --steps 20000 \
+  --omega 1.0 \
+  --rho0 1.0 \
+  --lid-ux 0.05 \
+  --lid-uy 0.0 \
+  --write-field-every 1000 \
+  --residual-every 1000 \
+  --output-dir outputs_m6
+```
+
+Residual diagnostics are written to `residual_history.csv` with columns:
+
+- `step`
+- `max_delta_u`
+- `global_mass`
+- `global_ke`
+
+Generate Milestone 06 plots from gathered global fields:
+
+```bash
+cd builddir
+python3 ../executables/milestone06/plot.py --input-dir outputs_m6
+```
+
+Generated plot files include:
+
+- `velocity_quiver_last.png`
+- `streamlines_last.png`
+- `speed_contour_last.png`
+- `u_centerline_vertical_last.png`
+- `v_centerline_horizontal_last.png`
+- `velocity_profile_overlay.png`
+- `density_profile_overlay.png`
+- `residual_history.png`
+- `global_mass_history.png`
+- `global_ke_history.png`
+
+Measure strong scaling:
+
+```bash
+cd <repo>
+python3 executables/milestone06/measure_scaling.py \
+  --build-dir builddir \
+  --output-dir builddir/outputs_m6_scaling \
+  --nprocs 1,2,4 \
+  --nx 128 \
+  --ny 128 \
+  --steps 2000
+```
+
+This writes:
+
+- `builddir/outputs_m6_scaling/scaling.csv`
+- `builddir/outputs_m6_scaling/speedup_vs_np.png`
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:
