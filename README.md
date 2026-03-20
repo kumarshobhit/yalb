@@ -348,6 +348,26 @@ This writes into `outputs_m5/plots/`:
 Milestone 6 parallelizes the lid-driven cavity solver across MPI ranks with
 1D x-direction domain decomposition and one-column halo exchange.
 
+Communication pattern and halo width (implemented):
+
+- Decomposition: 1D slabs in x, each rank owns a contiguous x-range.
+- Halo width: 1 column on each side of the local slab.
+- Exchanged data: full D2Q9 distribution `f(x, y, direction)` for all
+  `direction = 0..8` and all local `y`.
+- Neighbor pattern: left/right only (no y-neighbor exchange in this 1D split).
+- MPI primitive: `MPI_Sendrecv` in two pairs to avoid deadlock.
+
+Conceptual layout for rank `r`:
+
+```text
+left ghost | owned columns              | right ghost
+  x=0      | x=1 ... x=local_nx         | x=local_nx+1
+           ^ send to left from x=1
+           ^ recv from left into x=0
+                                   ^ send to right from x=local_nx
+                                   ^ recv from right into x=local_nx+1
+```
+
 Build it (only available when MPI is found during Meson configure):
 
 ```bash
@@ -415,6 +435,14 @@ This writes:
 
 - `builddir/outputs_m6_scaling/scaling.csv`
 - `builddir/outputs_m6_scaling/speedup_vs_np.png`
+
+GPU strong scaling via CMake (Kokkos CUDA on A100):
+
+```bash
+sbatch executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
+```
+
+This script builds Kokkos + the Milestone 06 CMake target and writes logs/plots to `outputs_gpu`.
 
 ### Compiling on bwUniCluster, with MPI
 

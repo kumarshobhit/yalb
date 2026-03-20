@@ -1,0 +1,22 @@
+option(
+  'kokkos_backend',
+  type : 'combo',
+  choices : ['serial', 'cuda'],
+  value : 'serial',
+  description : 'Kokkos execution backend to configure when using subproject fallback.'
+)
+
+option(
+  'kokkos_cuda_arch',
+  type : 'combo',
+  choices : ['AMPERE80', 'HOPPER90'],
+  value : 'AMPERE80',
+  description : 'CUDA architecture for Kokkos when kokkos_backend=cuda.'
+)
+
+option(
+  'enable_tests',
+  type : 'boolean',
+  value : true,
+  description : 'Build test targets.'
+)
