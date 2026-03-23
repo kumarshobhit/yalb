@@ -21,6 +21,11 @@ target_include_directories(lbm_m6
         "${PROJECT_ROOT}/src"
 )
 
+target_compile_definitions(lbm_m6
+    PUBLIC
+        WITH_MPI
+)
+
 target_link_libraries(lbm_m6
     PUBLIC
         Kokkos::kokkos

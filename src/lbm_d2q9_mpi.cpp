@@ -36,6 +36,7 @@ std::vector<int> make_displs_x(int nx, int ny, int size) {
     return displs;
 }
 
+
 }  // namespace
 
 DomainDecomposition1D decompose_domain_1d_x(int nx, int ny, MPI_Comm comm) {
@@ -74,7 +75,7 @@ void initialize_from_macroscopic_fields_local(
     const DomainDecomposition1D& decomp) {
     Kokkos::parallel_for(
         "initialize_from_macroscopic_fields_local",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
         KOKKOS_LAMBDA(const int x_owned, const int y) {
             const int x_local = x_owned + 1;
             const double density = rho(x_owned, y);
@@ -87,7 +88,7 @@ void initialize_from_macroscopic_fields_local(
 
     Kokkos::parallel_for(
         "initialize_ghost_columns",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {decomp.global_ny, Q}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {decomp.global_ny, Q}),
         KOKKOS_LAMBDA(const int y, const int direction) {
             f_with_ghost(0, y, direction) = 0.0;
             f_with_ghost(decomp.local_nx + 1, y, direction) = 0.0;
@@ -98,23 +99,31 @@ void exchange_halo_columns(DistributionView& f_owned_with_ghost, const DomainDec
     const int ny = decomp.global_ny;
     const int width = ny * Q;
 
-    auto host_f = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), f_owned_with_ghost);
+    if (decomp.left_rank == MPI_PROC_NULL && decomp.right_rank == MPI_PROC_NULL) {
+        return;
+    }
 
-    std::vector<double> send_left(width, 0.0);
-    std::vector<double> send_right(width, 0.0);
+    // halo exchange for multi rank only 
+    Kokkos::View<double*, MemorySpace> send_left_device("send_left_device", width);
+    Kokkos::View<double*, MemorySpace> send_right_device("send_right_device", width);
+
+    Kokkos::parallel_for(
+        "pack_halo_columns",
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {ny, Q}),
+        KOKKOS_LAMBDA(const int y, const int direction) {
+            const int idx = y * Q + direction;
+            send_left_device(idx) = f_owned_with_ghost(1, y, direction);
+            send_right_device(idx) = f_owned_with_ghost(decomp.local_nx, y, direction);
+        });
+
+    auto send_left_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), send_left_device);
+    auto send_right_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), send_right_device);
+
     std::vector<double> recv_left(width, 0.0);
     std::vector<double> recv_right(width, 0.0);
 
-    for (int y = 0; y < ny; ++y) {
-        for (int direction = 0; direction < Q; ++direction) {
-            const int idx = y * Q + direction;
-            send_left[idx] = host_f(1, y, direction);
-            send_right[idx] = host_f(decomp.local_nx, y, direction);
-        }
-    }
-
     MPI_Sendrecv(
-        send_left.data(),
+        send_left_host.data(),
         width,
         MPI_DOUBLE,
         decomp.left_rank,
@@ -128,7 +137,7 @@ void exchange_halo_columns(DistributionView& f_owned_with_ghost, const DomainDec
         MPI_STATUS_IGNORE);
 
     MPI_Sendrecv(
-        send_right.data(),
+        send_right_host.data(),
         width,
         MPI_DOUBLE,
         decomp.right_rank,
@@ -141,23 +150,40 @@ void exchange_halo_columns(DistributionView& f_owned_with_ghost, const DomainDec
         comm,
         MPI_STATUS_IGNORE);
 
+    Kokkos::View<double*, MemorySpace> recv_left_device("recv_left_device", width);
+    Kokkos::View<double*, MemorySpace> recv_right_device("recv_right_device", width);
+
     if (decomp.left_rank != MPI_PROC_NULL) {
-        for (int y = 0; y < ny; ++y) {
-            for (int direction = 0; direction < Q; ++direction) {
-                host_f(0, y, direction) = recv_left[y * Q + direction];
-            }
+        auto recv_left_host = Kokkos::create_mirror_view(recv_left_device);
+        for (int idx = 0; idx < width; ++idx) {
+            recv_left_host(idx) = recv_left[idx];
         }
+        Kokkos::deep_copy(recv_left_device, recv_left_host);
+
+        Kokkos::parallel_for(
+            "unpack_left_halo",
+            Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {ny, Q}),
+            KOKKOS_LAMBDA(const int y, const int direction) {
+                const int idx = y * Q + direction;
+                f_owned_with_ghost(0, y, direction) = recv_left_device(idx);
+            });
     }
 
     if (decomp.right_rank != MPI_PROC_NULL) {
-        for (int y = 0; y < ny; ++y) {
-            for (int direction = 0; direction < Q; ++direction) {
-                host_f(decomp.local_nx + 1, y, direction) = recv_right[y * Q + direction];
-            }
+        auto recv_right_host = Kokkos::create_mirror_view(recv_right_device);
+        for (int idx = 0; idx < width; ++idx) {
+            recv_right_host(idx) = recv_right[idx];
         }
-    }
+        Kokkos::deep_copy(recv_right_device, recv_right_host);
 
-    Kokkos::deep_copy(f_owned_with_ghost, host_f);
+        Kokkos::parallel_for(
+            "unpack_right_halo",
+            Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {ny, Q}),
+            KOKKOS_LAMBDA(const int y, const int direction) {
+                const int idx = y * Q + direction;
+                f_owned_with_ghost(decomp.local_nx + 1, y, direction) = recv_right_device(idx);
+            });
+    }
 }
 
 void stream_with_cavity_boundaries_local(
@@ -172,7 +198,7 @@ void stream_with_cavity_boundaries_local(
 
     Kokkos::parallel_for(
         "stream_with_cavity_boundaries_local",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({1, 0}, {decomp.local_nx + 1, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({1, 0}, {decomp.local_nx + 1, ny}),
         KOKKOS_LAMBDA(const int x_local, const int y) {
             const int x_global = decomp.x_offset + (x_local - 1);
 
@@ -209,7 +235,7 @@ void compute_density_local(
     const DomainDecomposition1D& decomp) {
     Kokkos::parallel_for(
         "compute_density_local",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
         KOKKOS_LAMBDA(const int x_owned, const int y) {
             const int x_local = x_owned + 1;
             double density = 0.0;
@@ -227,7 +253,7 @@ void compute_velocity_local(
     const DomainDecomposition1D& decomp) {
     Kokkos::parallel_for(
         "compute_velocity_local",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
         KOKKOS_LAMBDA(const int x_owned, const int y) {
             const int x_local = x_owned + 1;
             double momentum_x = 0.0;
@@ -258,7 +284,7 @@ void collide_bgk_local(
     const DomainDecomposition1D& decomp) {
     Kokkos::parallel_for(
         "collide_bgk_local",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {decomp.local_nx, decomp.global_ny}),
         KOKKOS_LAMBDA(const int x_owned, const int y) {
             const int x_local = x_owned + 1;
             const double density = rho(x_owned, y);

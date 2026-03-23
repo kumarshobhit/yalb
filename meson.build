@@ -1,12 +1,12 @@
 # https://mesonbuild.com/
 project(
-    'my-fantastic-simulation-code', # Project name
-    ['c', 'cpp'], # Project type. We need a C++ compiler. The C compiler is required for MPI.
-    version : '0.1'
+    'yalb', # Project name
+    ['c', 'cpp'], # Project type. The C compiler is required for MPI detection.
+    version : '0.1',
+    default_options : ['cpp_std=c++17']
 )
 
 cmake = import('cmake')
-add_project_arguments('-std=c++17', language : ['cpp'])
 
 # Optional dependency: Eigen3 linar algebra library
 # Make sure to add 'eigen' to the dependencies in your subdirectories if you

@@ -444,6 +444,60 @@ sbatch executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
 
 This script builds Kokkos + the Milestone 06 CMake target and writes logs/plots to `outputs_gpu`.
 
+
+### Current Recommended Milestone 06 Runs
+
+For the current Milestone 06 submission path, prefer the **single-node multi-GPU** script in
+`executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm`.
+The script is configured for one node with two GPUs and is the stable path used for the current MPI/Kokkos GPU results.
+
+Recommended environment:
+
+```bash
+module purge
+module load compiler/gnu mpi/openmpi devel/cuda
+```
+
+Set the installed Kokkos CMake path once:
+
+```bash
+export KOKKOS_DIR=/pfs/data6/home/fr/fr_fr/fr_sk1481/yalb/build_kokkos_cuda/install/lib64/cmake/Kokkos
+```
+
+Recheck the `2000x2000` single-GPU baseline:
+
+```bash
+NX=2000 NY=2000 NPROCS_CSV='1' OUTDIR='outputs_gpu_recheck_2000_np1' BUILD_DIR='build_release_gpu_strong_cmake_recheck_2000_np1' KOKKOS_BOOTSTRAP='never' KOKKOS_DIR="$KOKKOS_DIR" sbatch --wait --export=ALL executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
+```
+
+Run the `2000x2000` same-node `np=1,2` comparison:
+
+```bash
+NX=2000 NY=2000 NPROCS_CSV='1,2' OUTDIR='outputs_gpu_np2_same_node_fix3' BUILD_DIR='build_release_gpu_strong_cmake_np2_same_node_fix3' KOKKOS_BOOTSTRAP='never' KOKKOS_DIR="$KOKKOS_DIR" sbatch --wait --export=ALL executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
+```
+
+Run the larger same-node scaling checks:
+
+```bash
+NX=4000 NY=4000 NPROCS_CSV='1,2' OUTDIR='outputs_gpu_np2_same_node_4000' BUILD_DIR='build_release_gpu_strong_cmake_np2_same_node_4000' KOKKOS_BOOTSTRAP='never' KOKKOS_DIR="$KOKKOS_DIR" sbatch --wait --export=ALL executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
+
+NX=8000 NY=8000 NPROCS_CSV='1,2' OUTDIR='outputs_gpu_np2_same_node_8000' BUILD_DIR='build_release_gpu_strong_cmake_np2_same_node_8000' KOKKOS_BOOTSTRAP='never' KOKKOS_DIR="$KOKKOS_DIR" sbatch --wait --export=ALL executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm
+```
+
+Current reference result files:
+
+- `outputs_gpu_recheck_2000_np1/scaling_metrics.csv`
+- `outputs_gpu_np2_same_node_fix3/scaling_metrics.csv`
+- `outputs_gpu_np2_same_node_4000/scaling_metrics.csv`
+- `outputs_gpu_np2_same_node_8000/scaling_metrics.csv`
+- `outputs_gpu_np2_n2/scaling_metrics.csv` (two-node comparison)
+
+Main observations:
+
+- single-node multi-GPU is the stable Milestone 06 path for this code base
+- two-node `np=2` is worse than same-node `np=2`
+- larger grids improve efficiency, which points to communication overhead as the dominant bottleneck
+
 ### Compiling on bwUniCluster, with MPI
 
 The above steps should be done *after* loading the appropriate packages:

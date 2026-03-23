@@ -351,3 +351,13 @@ cython_debug/
 
 /outputs/
 /outputs_4000/
+/outputs_gpu/
+/outputs*/
+/build*/
+/slurm-*.out
+logs/
+# Local presentation/notes files not meant for code submission
+/milestone06_slides.pptx
+/milestone06_slides.md
+/milestone06_tuesday_outline.md
+/slides_colloquium_m2_m6.md

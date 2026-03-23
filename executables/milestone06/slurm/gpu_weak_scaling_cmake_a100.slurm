@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=lbm-gpu-strong-cmake
+#SBATCH --job-name=lbm-gpu-weak-cmake
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=2
@@ -21,7 +21,7 @@ export OMP_NUM_THREADS=1
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-NX=${NX:-2000}
+BASE_LOCAL_NX=${BASE_LOCAL_NX:-2000}
 NY=${NY:-2000}
 STEPS=${STEPS:-2000}
 OMEGA=${OMEGA:-1.0}
@@ -45,13 +45,13 @@ ALLOW_GIT_FETCH=${ALLOW_GIT_FETCH:-0}
 CUDA_ARCH=${CUDA_ARCH:-80}
 KOKKOS_DIR=${KOKKOS_DIR:-}
 
-BUILD_DIR=${BUILD_DIR:-build_release_gpu_strong_cmake}
-OUTDIR=${OUTDIR:-outputs_gpu}
+BUILD_DIR=${BUILD_DIR:-build_release_gpu_weak_cmake}
+OUTDIR=${OUTDIR:-outputs_gpu_weak}
 EXE="${BUILD_DIR}/executables/milestone06/milestone06"
 
 usage_hint() {
   echo "Example rerun:" >&2
-  echo "  KOKKOS_SOURCE_TARBALL=/path/to/kokkos-${KOKKOS_VERSION}.tar.gz sbatch executables/milestone06/slurm/gpu_strong_scaling_cmake_a100.slurm" >&2
+  echo "  KOKKOS_SOURCE_TARBALL=/path/to/kokkos-${KOKKOS_VERSION}.tar.gz sbatch executables/milestone06/slurm/gpu_weak_scaling_cmake_a100.slurm" >&2
 }
 
 fail() {
@@ -100,9 +100,9 @@ mkdir -p "${KOKKOS_WORK_ROOT}"
 if [[ "${KOKKOS_BOOTSTRAP}" != "force" ]]; then
   if [[ -n "${KOKKOS_DIR}" ]]; then
     if [[ -f "${KOKKOS_DIR}/KokkosConfig.cmake" ]]; then
-      echo "[gpu-strong-cmake] Using user-provided KOKKOS_DIR=${KOKKOS_DIR}"
+      echo "[gpu-weak-cmake] Using user-provided KOKKOS_DIR=${KOKKOS_DIR}"
     else
-      echo "[gpu-strong-cmake] Warning: ignoring invalid KOKKOS_DIR=${KOKKOS_DIR} (KokkosConfig.cmake missing)"
+      echo "[gpu-weak-cmake] Warning: ignoring invalid KOKKOS_DIR=${KOKKOS_DIR} (KokkosConfig.cmake missing)"
       KOKKOS_DIR=""
     fi
   fi
@@ -110,7 +110,7 @@ if [[ "${KOKKOS_BOOTSTRAP}" != "force" ]]; then
   if [[ -z "${KOKKOS_DIR}" ]]; then
     if resolved="$(resolve_kokkos_dir_from_prefix "${KOKKOS_PREFIX}")"; then
       KOKKOS_DIR="${resolved}"
-      echo "[gpu-strong-cmake] Found Kokkos in KOKKOS_PREFIX: ${KOKKOS_DIR}"
+      echo "[gpu-weak-cmake] Found Kokkos in KOKKOS_PREFIX: ${KOKKOS_DIR}"
     fi
   fi
 
@@ -122,7 +122,7 @@ if [[ "${KOKKOS_BOOTSTRAP}" != "force" ]]; then
       fi
       if resolved="$(resolve_kokkos_dir_from_prefix "${prefix}")"; then
         KOKKOS_DIR="${resolved}"
-        echo "[gpu-strong-cmake] Found Kokkos in CMAKE_PREFIX_PATH entry: ${KOKKOS_DIR}"
+        echo "[gpu-weak-cmake] Found Kokkos in CMAKE_PREFIX_PATH entry: ${KOKKOS_DIR}"
         break
       fi
     done
@@ -141,10 +141,10 @@ elif [[ -z "${KOKKOS_DIR}" ]]; then
 fi
 
 if (( need_bootstrap )); then
-  echo "[gpu-strong-cmake] Bootstrapping Kokkos (mode=${KOKKOS_BOOTSTRAP})"
-  echo "[gpu-strong-cmake] Kokkos source: ${KOKKOS_SRC}"
-  echo "[gpu-strong-cmake] Kokkos build: ${KOKKOS_BUILD}"
-  echo "[gpu-strong-cmake] Kokkos install: ${KOKKOS_PREFIX}"
+  echo "[gpu-weak-cmake] Bootstrapping Kokkos (mode=${KOKKOS_BOOTSTRAP})"
+  echo "[gpu-weak-cmake] Kokkos source: ${KOKKOS_SRC}"
+  echo "[gpu-weak-cmake] Kokkos build: ${KOKKOS_BUILD}"
+  echo "[gpu-weak-cmake] Kokkos install: ${KOKKOS_PREFIX}"
 
   if [[ -n "${KOKKOS_SOURCE_TARBALL}" ]]; then
     if [[ ! -f "${KOKKOS_SOURCE_TARBALL}" ]]; then
@@ -161,14 +161,7 @@ if (( need_bootstrap )); then
   fi
 
   rm -rf "${KOKKOS_BUILD}" "${KOKKOS_PREFIX}"
-  cmake -S "${KOKKOS_SRC}" -B "${KOKKOS_BUILD}" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="${KOKKOS_PREFIX}" \
-    -DCMAKE_CXX_COMPILER="${KOKKOS_SRC}/bin/nvcc_wrapper" \
-    -DKokkos_ENABLE_CUDA=ON \
-    -DKokkos_ENABLE_SERIAL=ON \
-    -DKokkos_ENABLE_TESTS=OFF \
-    "-D${KOKKOS_ARCH_FLAG}=ON"
+  cmake -S "${KOKKOS_SRC}" -B "${KOKKOS_BUILD}"     -DCMAKE_BUILD_TYPE=Release     -DCMAKE_INSTALL_PREFIX="${KOKKOS_PREFIX}"     -DCMAKE_CXX_COMPILER="${KOKKOS_SRC}/bin/nvcc_wrapper"     -DKokkos_ENABLE_CUDA=ON     -DKokkos_ENABLE_SERIAL=ON     -DKokkos_ENABLE_TESTS=OFF     "-D${KOKKOS_ARCH_FLAG}=ON"
 
   cmake --build "${KOKKOS_BUILD}" -j
   cmake --install "${KOKKOS_BUILD}"
@@ -198,20 +191,17 @@ if [[ ! -x "${KOKKOS_NVCC_WRAPPER}" ]]; then
   fail "Could not find executable nvcc_wrapper in ${KOKKOS_PREFIX}/bin, ${KOKKOS_PREFIX_FROM_DIR:-<derived-none>}/bin, or ${KOKKOS_SRC}/bin."
 fi
 
-echo "[gpu-strong-cmake] KOKKOS_BOOTSTRAP: ${KOKKOS_BOOTSTRAP}"
-echo "[gpu-strong-cmake] KOKKOS_PREFIX: ${KOKKOS_PREFIX}"
-echo "[gpu-strong-cmake] Resolved KOKKOS_DIR: ${KOKKOS_DIR}"
-echo "[gpu-strong-cmake] Kokkos compiler wrapper: ${KOKKOS_NVCC_WRAPPER}"
-echo "[gpu-strong-cmake] Build directory: ${BUILD_DIR}"
-echo "[gpu-strong-cmake] Output directory: ${OUTDIR}"
-echo "[gpu-strong-cmake] Fixed case: NX=${NX} NY=${NY} STEPS=${STEPS}"
-echo "[gpu-strong-cmake] NPROCS: ${NPROCS[*]}"
+echo "[gpu-weak-cmake] KOKKOS_BOOTSTRAP: ${KOKKOS_BOOTSTRAP}"
+echo "[gpu-weak-cmake] KOKKOS_PREFIX: ${KOKKOS_PREFIX}"
+echo "[gpu-weak-cmake] Resolved KOKKOS_DIR: ${KOKKOS_DIR}"
+echo "[gpu-weak-cmake] Kokkos compiler wrapper: ${KOKKOS_NVCC_WRAPPER}"
+echo "[gpu-weak-cmake] Build directory: ${BUILD_DIR}"
+echo "[gpu-weak-cmake] Output directory: ${OUTDIR}"
+echo "[gpu-weak-cmake] Weak case: BASE_LOCAL_NX=${BASE_LOCAL_NX} NY=${NY} STEPS=${STEPS}"
+echo "[gpu-weak-cmake] NPROCS: ${NPROCS[*]}"
 
 rm -rf "${BUILD_DIR}"
-cmake -S executables/milestone06/cmake -B "${BUILD_DIR}" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER="${KOKKOS_NVCC_WRAPPER}" \
-  -DKokkos_DIR="${KOKKOS_DIR}"
+cmake -S executables/milestone06/cmake -B "${BUILD_DIR}"   -DCMAKE_BUILD_TYPE=Release   -DCMAKE_CXX_COMPILER="${KOKKOS_NVCC_WRAPPER}"   -DKokkos_DIR="${KOKKOS_DIR}"
 
 cmake --build "${BUILD_DIR}" -j
 
@@ -238,24 +228,13 @@ if (( allocated_nodes > 0 && allocated_nodes != 1 )); then
 fi
 
 for np in "${NPROCS[@]}"; do
+    nx=$(( BASE_LOCAL_NX * np ))
     log_file="${OUTDIR}/run_np${np}.log"
     run_dir="${OUTDIR}/fields_np${np}"
     mkdir -p "${run_dir}"
 
-    echo "[gpu-strong-cmake] Running np=${np}, log=${log_file}"
-    srun --mpi="${SRUN_MPI_FLAG}" --nodes=1 --ntasks="${np}" --ntasks-per-node="${np}" \
-      --gpus-per-task=1 --gpu-bind="${SRUN_GPU_BIND}" --cpus-per-task=1 "${EXE}" \
-      --nx "${NX}" \
-      --ny "${NY}" \
-      --steps "${STEPS}" \
-      --omega "${OMEGA}" \
-      --rho0 "${RHO0}" \
-      --lid-ux "${LID_UX}" \
-      --lid-uy "${LID_UY}" \
-      --write-field-every "${STEPS}" \
-      --residual-every 500 \
-      --output-dir "${run_dir}" \
-      > "${log_file}" 2>&1
+    echo "[gpu-weak-cmake] Running np=${np}, nx=${nx}, ny=${NY}, log=${log_file}"
+    srun --mpi="${SRUN_MPI_FLAG}" --nodes=1 --ntasks="${np}" --ntasks-per-node="${np}"       --gpus-per-task=1 --gpu-bind="${SRUN_GPU_BIND}" --cpus-per-task=1 "${EXE}"       --nx "${nx}"       --ny "${NY}"       --steps "${STEPS}"       --omega "${OMEGA}"       --rho0 "${RHO0}"       --lid-ux "${LID_UX}"       --lid-uy "${LID_UY}"       --write-field-every "${STEPS}"       --residual-every 500       --output-dir "${run_dir}"       > "${log_file}" 2>&1
 
     if ! grep -q "MPI ranks: ${np}," "${log_file}"; then
         echo "ERROR: np=${np} run did not report expected MPI rank count." >&2
@@ -264,17 +243,9 @@ for np in "${NPROCS[@]}"; do
     fi
 done
 
-python3 executables/milestone06/parse_strong_scaling.py \
-  --log-dir "${OUTDIR}" \
-  --nprocs "${NPROCS_CSV}" \
-  --nx "${NX}" \
-  --ny "${NY}" \
-  --steps "${STEPS}" \
-  --output-csv "${OUTDIR}/scaling_metrics.csv"
+python3 executables/milestone06/parse_weak_scaling.py   --log-dir "${OUTDIR}"   --nprocs "${NPROCS_CSV}"   --base-local-nx "${BASE_LOCAL_NX}"   --ny "${NY}"   --steps "${STEPS}"   --output-csv "${OUTDIR}/weak_scaling_metrics.csv"
 
-python3 executables/milestone06/plot_strong_scaling.py \
-  --csv "${OUTDIR}/scaling_metrics.csv" \
-  --outdir "${OUTDIR}"
+python3 executables/milestone06/plot_weak_scaling.py   --csv "${OUTDIR}/weak_scaling_metrics.csv"   --outdir "${OUTDIR}"
 
-echo "[gpu-strong-cmake] Completed."
-echo "[gpu-strong-cmake] Wrote ${OUTDIR}/scaling_metrics.csv"
+echo "[gpu-weak-cmake] Completed."
+echo "[gpu-weak-cmake] Wrote ${OUTDIR}/weak_scaling_metrics.csv"

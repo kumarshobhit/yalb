@@ -179,6 +179,22 @@ int main(int argc, char* argv[]) {
 
     Kokkos::initialize(argc, argv);
     {
+        if (rank == 0) {
+            std::cout << "Kokkos DefaultExecutionSpace: " << Kokkos::DefaultExecutionSpace::name() << std::endl;
+            std::cout << "LBM Selected ExecutionSpace: " << lbm_d2q9::ExecutionSpace::name() << std::endl;
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        for (int r = 0; r < size; ++r) {
+            if (rank == r) {
+                const char* cuda_visible_devices = std::getenv("CUDA_VISIBLE_DEVICES");
+                std::cout << "Rank " << rank
+                          << " CUDA_VISIBLE_DEVICES=" << (cuda_visible_devices ? cuda_visible_devices : "<unset>")
+                          << std::endl;
+                Kokkos::print_configuration(std::cout, false);
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
         const auto decomp = lbm_d2q9::decompose_domain_1d_x(config.nx, config.ny, MPI_COMM_WORLD);
 
         if (rank == 0) {

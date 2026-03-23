@@ -23,7 +23,7 @@ void initialize_uniform_macroscopic_fields(
     double uy0) {
     Kokkos::parallel_for(
         "initialize_uniform_macroscopic_fields",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             rho(x, y) = rho0;
             u(x, y, 0) = ux0;
@@ -40,7 +40,7 @@ void initialize_shear_wave_macroscopic_fields(
     double amplitude) {
     Kokkos::parallel_for(
         "initialize_shear_wave_macroscopic_fields",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             (void)x;
             const double wave = amplitude * sin(2.0 * pi * static_cast<double>(y) / static_cast<double>(ny));
@@ -53,7 +53,7 @@ void initialize_shear_wave_macroscopic_fields(
 void initialize_from_macroscopic_fields(const DensityView& rho, const VelocityView& u, DistributionView& f, int nx, int ny) {
     Kokkos::parallel_for(
         "initialize_from_macroscopic_fields",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             const double density = rho(x, y);
             const double ux = u(x, y, 0);
@@ -68,7 +68,7 @@ void initialize_from_macroscopic_fields(const DensityView& rho, const VelocityVi
 void streaming(const DistributionView& f_in, DistributionView& f_out, int nx, int ny) {
     Kokkos::parallel_for(
         "streaming",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             for (int direction = 0; direction < Q; ++direction) {
                 int neighbor_x = x - cx(direction);
@@ -101,7 +101,7 @@ void stream_with_cavity_boundaries(
     double rho_wall) {
     Kokkos::parallel_for(
         "stream_with_cavity_boundaries",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             for (int direction = 0; direction < Q; ++direction) {
                 const int source_x = x - cx(direction);
@@ -135,7 +135,7 @@ void stream_with_cavity_boundaries(
 void compute_density(const DistributionView& f, DensityView& rho, int nx, int ny) {
     Kokkos::parallel_for(
         "compute_density",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             double density = 0.0;
             for (int direction = 0; direction < Q; ++direction) {
@@ -148,7 +148,7 @@ void compute_density(const DistributionView& f, DensityView& rho, int nx, int ny
 void compute_velocity(const DistributionView& f, const DensityView& rho, VelocityView& u, int nx, int ny) {
     Kokkos::parallel_for(
         "compute_velocity",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             double momentum_x = 0.0;
             double momentum_y = 0.0;
@@ -174,7 +174,7 @@ void compute_velocity(const DistributionView& f, const DensityView& rho, Velocit
 void collide_bgk(DistributionView& f, const DensityView& rho, const VelocityView& u, double omega, int nx, int ny) {
     Kokkos::parallel_for(
         "collide_bgk",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {nx, ny}),
+        Kokkos::MDRangePolicy<ExecutionSpace, Kokkos::Rank<2>>({0, 0}, {nx, ny}),
         KOKKOS_LAMBDA(const int x, const int y) {
             const double density = rho(x, y);
             const double ux = u(x, y, 0);

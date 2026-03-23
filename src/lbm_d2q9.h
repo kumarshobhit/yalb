@@ -9,9 +9,16 @@ namespace lbm_d2q9 {
 
 constexpr int Q = 9;
 
-using DistributionView = Kokkos::View<double***>;
-using DensityView = Kokkos::View<double**>;
-using VelocityView = Kokkos::View<double***>;
+#if defined(KOKKOS_ENABLE_CUDA)
+using ExecutionSpace = Kokkos::Cuda;
+#else
+using ExecutionSpace = Kokkos::DefaultExecutionSpace;
+#endif
+using MemorySpace = ExecutionSpace::memory_space;
+
+using DistributionView = Kokkos::View<double***, MemorySpace>;
+using DensityView = Kokkos::View<double**, MemorySpace>;
+using VelocityView = Kokkos::View<double***, MemorySpace>;
 
 constexpr double pi = 3.14159265358979323846;
 
