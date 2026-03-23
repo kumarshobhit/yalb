@@ -458,10 +458,22 @@ module purge
 module load compiler/gnu mpi/openmpi devel/cuda
 ```
 
-Set the installed Kokkos CMake path once:
+Set the installed Kokkos CMake path once, using your local installation:
+
+```bash
+export KOKKOS_DIR=/path/to/your/kokkos/install/lib64/cmake/Kokkos
+```
+
+For my own runs on bwUniCluster, I used:
 
 ```bash
 export KOKKOS_DIR=/pfs/data6/home/fr/fr_fr/fr_sk1481/yalb/build_kokkos_cuda/install/lib64/cmake/Kokkos
+```
+
+If you do not already have a Kokkos install, the SLURM launcher can also bootstrap it automatically when you provide a source tarball and leave `KOKKOS_BOOTSTRAP=auto`:
+
+```bash
+export KOKKOS_SOURCE_TARBALL=/path/to/kokkos-4.5.01.tar.gz
 ```
 
 Recheck the `2000x2000` single-GPU baseline:
